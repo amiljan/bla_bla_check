@@ -85,6 +85,10 @@ class WatchService : Service() {
                     lastCheck = System.currentTimeMillis(),
                     lastStatus = "OK: ${rides.size} rides that day, ${hits.size} new match${if (hits.size == 1) "" else "es"}")
             }
+        } catch (e: Blocked) {
+            val t = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(e.until))
+            app.repo.update(id) { it.copy(lastCheck = System.currentTimeMillis(), lastStatus = "Blocked by BlaBlaCar, retrying after $t") }
+            withContext(Dispatchers.IO) { app.notifier.blocked(e.until) }
         } catch (e: CaptchaRequired) {
             app.repo.update(id) { it.copy(lastCheck = System.currentTimeMillis(), lastStatus = "Captcha needed: open Settings > Solve captcha") }
             withContext(Dispatchers.IO) { app.notifier.captcha() }

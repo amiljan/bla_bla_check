@@ -34,6 +34,7 @@ sealed interface Screen {
     data object List : Screen
     data object Add : Screen
     data object Settings : Screen
+    data object Day : Screen
 }
 
 class MainActivity : ComponentActivity() {
@@ -53,7 +54,8 @@ fun Root(app: App) {
     var screen by remember { mutableStateOf<Screen>(Screen.List) }
     BackHandler(screen != Screen.List) { screen = Screen.List }
     when (screen) {
-        Screen.List -> WatchList(app, onAdd = { screen = Screen.Add }, onSettings = { screen = Screen.Settings })
+        Screen.List -> WatchList(app, onAdd = { screen = Screen.Add }, onSettings = { screen = Screen.Settings }, onDay = { screen = Screen.Day })
+        Screen.Day -> DayView(app, onBack = { screen = Screen.List })
         Screen.Add -> AddWatch(app, onDone = { screen = Screen.List })
         Screen.Settings -> SettingsScreen(app, onBack = { screen = Screen.List })
     }
@@ -64,12 +66,13 @@ private fun fmtTime(ms: Long) = if (ms == 0L) "never" else Instant.ofEpochMilli(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WatchList(app: App, onAdd: () -> Unit, onSettings: () -> Unit) {
+fun WatchList(app: App, onAdd: () -> Unit, onSettings: () -> Unit, onDay: () -> Unit) {
     val ctx = LocalContext.current
     val watches by app.repo.watches.collectAsState()
     Scaffold(
         topBar = {
             TopAppBar(title = { Text("BlaBla Check") }, actions = {
+                TextButton(onClick = onDay) { Text("Day view") }
                 IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, "Settings") }
             })
         },
@@ -109,7 +112,7 @@ fun WatchList(app: App, onAdd: () -> Unit, onSettings: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CityPicker(label: String, value: City, onPick: (City) -> Unit) {
+fun CityPicker(label: String, value: City, onPick: (City) -> Unit) {
     var open by remember { mutableStateOf(false) }
     ExposedDropdownMenuBox(expanded = open, onExpandedChange = { open = it }) {
         OutlinedTextField(
@@ -133,7 +136,7 @@ private fun TimeButton(label: String, value: LocalTime, onPick: (LocalTime) -> U
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DateButton(label: String, value: LocalDate, onPick: (LocalDate) -> Unit, modifier: Modifier = Modifier) {
+fun DateButton(label: String, value: LocalDate, onPick: (LocalDate) -> Unit, modifier: Modifier = Modifier) {
     var open by remember { mutableStateOf(false) }
     OutlinedButton(modifier = modifier, onClick = { open = true }) { Text("$label $value") }
     if (open) {

@@ -38,3 +38,24 @@ Verified on the phone:
 * Test watches were seeded straight into SharedPreferences over adb (`run-as`) to avoid driving date pickers by
   coordinate taps, then removed.
 * Not verified: boot-time restart (`BootReceiver`) and the captcha flow (DataDome never challenged the WebView).
+
+## Phase 2: day view with real start
+
+Built: `TripParser` (itinerary legs from the trip page's JS object), `Geo` (Nominatim geocoding with persistent cache,
+haversine), `DayView` (route/date/location pickers, progressive loading, sort by distance of the driver's real start).
+
+Findings:
+* The trip page lists the whole ride's stops. Active stops (with exact coordinates) are where this passenger boards and
+  leaves; inactive ones (city name only) are the rest of the driver's route. The driver's true origin is the first stop,
+  active or not. Example from the user's second link: Straubing (inactive) -> Graz (OMV, boards 01:40) -> Krapina ->
+  Slavonski Brod (inactive).
+* Verified on the phone with Graz -> Zagreb for 12 Nov: rides correctly showed real starts such as Olching, Frankfurt am
+  Main and Zwolle, with "You would board in Graz (OMV)", sorted by distance from Graz.
+
+**Incident:** while loading that list (trip pages 300 ms apart, after earlier recon traffic) DataDome switched to a hard
+block page ("You have been blocked ... behaviour of the browser has caught our attention") for this IP. It is not
+solvable like a captcha. I did not try to evade it (no cookie clearing, spoofing or IP tricks). Fix: `WebFetcher` now
+detects the block (403 without a captcha URL, or block text on the page), throws `Blocked`, backs off 30 min doubling to
+4 h, and sends nothing meanwhile; the watcher shows the status and notifies once; Day view spaces trip reads 2–4 s apart.
+Unknown: whether the block came from the HTML trip fetches, the total volume, or the recon session. Not verified: that
+the block lifts and that the new throttling avoids it.

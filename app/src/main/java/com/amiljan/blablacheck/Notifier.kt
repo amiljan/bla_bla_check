@@ -79,6 +79,17 @@ class Notifier(private val ctx: Context, private val repo: Repo) {
         ntfy("BlaBla Check: captcha needed", "Open the app and solve the captcha so checking can continue.", null)
     }
 
+    private var lastBlockAlert = 0L
+    fun blocked(until: Long) {
+        val now = System.currentTimeMillis()
+        if (now - lastBlockAlert < 3 * 3_600_000) return
+        lastBlockAlert = now
+        val t = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(until))
+        val msg = "BlaBlaCar's bot protection blocked this phone. Checks are paused until about $t and no requests are sent meanwhile."
+        post(CH_ALERT, "BlaBla Check is blocked", msg, null, 8)
+        ntfy("BlaBla Check blocked", msg, null)
+    }
+
     fun test() {
         post(CH_MATCH, "BlaBla Check test", "Notifications work.", null)
         ntfy("BlaBla Check test", "ntfy push works.", null)

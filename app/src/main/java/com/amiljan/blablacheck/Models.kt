@@ -46,6 +46,11 @@ data class Ride(
 }
 
 class CaptchaRequired : Exception("BlaBlaCar is asking for a captcha")
+/** BlaBlaCar's bot protection has blocked this session/IP. The app backs off until [until] (epoch millis) and sends no requests meanwhile. */
+class Blocked(val until: Long) : Exception("Blocked by BlaBlaCar's bot protection")
 class FetchError(msg: String) : Exception(msg)
 
 fun hmToMin(s: String): Int { val p = s.split(":"); return p[0].toInt() * 60 + p[1].toInt() }
+
+/** One stop of a trip page itinerary. Active stops are where this passenger boards/leaves; inactive ones are the rest of the ride. */
+data class Leg(val active: Boolean, val time: String?, val city: String, val street: String?, val lat: Double?, val lng: Double?)
