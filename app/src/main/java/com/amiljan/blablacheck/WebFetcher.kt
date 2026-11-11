@@ -129,25 +129,28 @@ class WebFetcher(private val ctx: Context) {
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
-    fun searchUrl(from: City, to: City, date: String) =
-        "https://edge.blablacar.hr/trip/search/v9?from_place_id=${enc(from.placeId)}&to_place_id=${enc(to.placeId)}" +
+    fun searchUrl(fromId: String, toId: String, date: String) =
+        "https://edge.blablacar.hr/trip/search/v9?from_place_id=${enc(fromId)}&to_place_id=${enc(toId)}" +
             "&departure_date=$date&requested_seats=1&supply=CARPOOLING&search_origin=HOME&jrny_stp=ONE_WAY"
 
     /** All carpool rides for one direction and date (follows pagination). */
-    suspend fun search(from: City, to: City, date: String): List<Ride> = withContext(Dispatchers.Main) {
+    suspend fun search(from: City, to: City, date: String): List<Ride> = searchIds(from.placeId, to.placeId, date)
+
+    /** Same search by raw blablacar place ids (used to search from arbitrary towns in phase 3). */
+    suspend fun searchIds(fromId: String, toId: String, date: String): List<Ride> = withContext(Dispatchers.Main) {
         mutex.withLock {
             checkCooldown()
-            var out = trySearch(from, to, date, force = false)
-            if (out.startsWith("ERR 401")) out = trySearch(from, to, date, force = true)
+            var out = trySearch(fromId, toId, date, force = false)
+            if (out.startsWith("ERR 401")) out = trySearch(fromId, toId, date, force = true)
             if (!out.startsWith("OK")) fail(out)
             blockCount = 0
             Parser.rides(out.substring(2))
         }
     }
 
-    private suspend fun trySearch(from: City, to: City, date: String, force: Boolean): String {
+    private suspend fun trySearch(fromId: String, toId: String, date: String, force: Boolean): String {
         ensureReady(force)
-        val url = JSONObject.quote(searchUrl(from, to, date))
+        val url = JSONObject.quote(searchUrl(fromId, toId, date))
         return runJs("""
           var h=Object.assign({},window.__bbcH); var pages=[]; var cur=null;
           for(var i=0;i<10;i++){
@@ -160,6 +163,23 @@ class WebFetcher(private val ctx: Context) {
           }
           BBCBridge.result(ID,'OK'+JSON.stringify(pages));
         """.trimIndent())
+    }
+
+    /** blablacar place id for a free-text place name (first suggestion), or null if none. */
+    suspend fun placeId(query: String): String? = withContext(Dispatchers.Main) {
+        mutex.withLock {
+            checkCooldown()
+            ensureReady()
+            val out = runJs("""
+              var h=Object.assign({},window.__bbcH);
+              var r=await fetch('https://edge.blablacar.hr/location/suggestions?with_user_history=false&query='+encodeURIComponent(${JSONObject.quote(query)}),{headers:h,credentials:'include'});
+              if(r.status!=200){ var eb=''; try{eb=(await r.text()).substring(0,300);}catch(e){} BBCBridge.result(ID,'ERR '+r.status+' '+eb); return; }
+              var j=await r.json(); BBCBridge.result(ID,'OK'+JSON.stringify(j.slice(0,1)));
+            """.trimIndent())
+            if (!out.startsWith("OK")) fail(out)
+            kotlinx.serialization.json.Json.parseToJsonElement(out.substring(2)).let { it as? kotlinx.serialization.json.JsonArray }
+                ?.firstOrNull()?.let { (it as? kotlinx.serialization.json.JsonObject)?.get("id") as? kotlinx.serialization.json.JsonPrimitive }?.content
+        }
     }
 
     /** Raw HTML of a trip page (same-origin fetch from inside the page, so the DataDome cookie applies). */

@@ -11,7 +11,7 @@ Native Kotlin + Jetpack Compose, sideloaded over `adb`. No server, no account, n
 |---|---|---|
 | 1 | Watch routes every 5 min, notify on match (local + ntfy.sh) | done |
 | 2 | Day view of rides sorted by the driver's *real* start vs. a city you pick | done (see the block warning below) |
-| 3 | Find a pickup town along the route where the fixed price is about 10 / 20 EUR higher | planned |
+| 3 | Find a pickup town along the route where the fixed price is about 10 / 20 EUR higher | built and unit-tested; live blablacar part not verified (see below) |
 
 ## How it works
 
@@ -63,6 +63,28 @@ is geocoded with OpenStreetMap Nominatim). The app lists every carpool ride that
 driver's real first stop (for example a ride that the search card labels "Graz" but that really starts in Straubing),
 and sorts by the straight-line distance from that start to your location. Starts that are only a city name (no exact
 address) are geocoded to the city centre and shown with "≈". Tapping a ride opens its blablacar page.
+
+## Pickup-town price finder (phase 3)
+
+BlaBlaCar prices a ride by distance and will not let you offer your own price. If a driver starts far before your
+boarding stop (say Olching, you are in Graz), the same ride booked from an earlier town on their route costs more. On a
+Day view row where the driver starts elsewhere, **Find +10 / +20 € pickup towns** does this:
+
+1. Routes the driver's real start to your boarding stop (OSRM public server) and names about 18 points along it
+   (OpenStreetMap, 1 request/s).
+2. For a candidate town, searches *town to destination* on blablacar and reads **this same ride's** price (matched by
+   ride id, falling back to driver + arrival time).
+3. A binary search over the towns (price only rises with distance) finds the town closest to base +10 € and +20 €. About
+   7 searches in total, hard-capped at 14, 2.5–4.5 s apart. "Not offered from this town" is treated as "too far".
+4. Shows the town, exact price and a link to open that ride. You book it as *town to destination* and agree the real
+   pickup with the driver (for example "I'm in Graz, can we meet there?"). The driver is told the extra money in
+   advance and nothing here pays or books for you.
+
+Whether a given driver agrees is between you and them; the app only finds the price points.
+
+## Tests
+
+`./gradlew testDebugUnitTest` runs 7 offline unit tests (price search, route sampling, both HTML/JSON parsers).
 
 ## Limitations and caveats
 

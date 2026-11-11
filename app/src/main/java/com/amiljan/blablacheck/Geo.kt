@@ -55,4 +55,17 @@ class Geo(ctx: Context) {
         prefs.edit().putString(key, "${p.lat}|${p.lng}|${p.name}").apply()
         return p
     }
+
+    /** Nearest town name (and country) for a coordinate, cached by ~1 km cell. */
+    suspend fun reverseTown(lat: Double, lng: Double): Pair<String, String?>? {
+        val key = "r:%.2f,%.2f".format(java.util.Locale.US, lat, lng)
+        prefs.getString(key, null)?.let { c -> val p = c.split("|"); return p[0] to p.getOrNull(1)?.ifEmpty { null } }
+        val body = get("https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&accept-language=en&lat=$lat&lon=$lng") ?: return null
+        val o = Json.parseToJsonElement(body).jsonObject
+        val a = o["address"]?.jsonObject ?: return null
+        val town = listOf("city", "town", "village", "municipality", "county").firstNotNullOfOrNull { a[it]?.jsonPrimitive?.contentOrNull } ?: return null
+        val country = a["country"]?.jsonPrimitive?.contentOrNull
+        prefs.edit().putString(key, "$town|${country ?: ""}").apply()
+        return town to country
+    }
 }

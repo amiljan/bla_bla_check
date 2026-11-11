@@ -59,3 +59,23 @@ detects the block (403 without a captcha URL, or block text on the page), throws
 4 h, and sends nothing meanwhile; the watcher shows the status and notifies once; Day view spaces trip reads 2–4 s apart.
 Unknown: whether the block came from the HTML trip fetches, the total volume, or the recon session. Not verified: that
 the block lifts and that the new throttling avoids it.
+
+## Phase 3: pickup-town price finder
+
+Built: `Route` (OSRM geometry + sampling from the boarding stop back to the origin), `Geo.reverseTown`,
+`WebFetcher.placeId` / `searchIds`, `PriceFinder` (binary search, shared probes, hard search budget, null = too far),
+`PickupFinder` screen reached from a Day view row, 7 unit tests.
+
+Verified:
+* `./gradlew testDebugUnitTest`: 7/7 pass (finder picks T4/T9 for +10/+20 on a 0.1 EUR/km model within the budget;
+  "not offered" treated as too far; budget cap respected; route sampling; trip-page leg parser incl. the Straubing
+  shape; search-result parser incl. price tokens and bus exclusion).
+* OSRM and Nominatim against a real Olching -> Graz route: 435 km, 48 points; reverse geocoding returns town names
+  (e.g. Liezen, Fornach).
+
+**Not verified live (blocked):** DataDome was still serving "You have been blocked" about 5 minutes after the first
+block, so none of the following has run against blablacar.hr: the throttled Day view, `placeId` lookups, searching
+from an intermediate town, and the key assumption that **the same ride keeps the same id (or at least driver and
+arrival time) across searches from different towns**. If that assumption is wrong the finder reports "not offered"
+everywhere. First thing to do once the block lifts: run one Day view row's finder and compare a town price with a manual
+search on the site.

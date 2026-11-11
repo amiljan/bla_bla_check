@@ -46,7 +46,9 @@ fun DayView(app: App, onBack: () -> Unit) {
     var rows by remember { mutableStateOf<List<DayRow>>(emptyList()) }
     var status by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
-    BackHandler { onBack() }
+    var picking by remember { mutableStateOf<DayRow?>(null) }
+    BackHandler { if (picking != null) picking = null else onBack() }
+    picking?.let { PickupFinder(app, it, to, date, onBack = { picking = null }); return }
 
     fun sorted(l: List<DayRow>) = l.sortedWith(compareBy({ it.km ?: Double.MAX_VALUE }, { it.ride.dep }))
 
@@ -118,6 +120,8 @@ fun DayView(app: App, onBack: () -> Unit) {
                         Text("${r.ride.dep} → ${r.ride.arr}${if (r.ride.overnight) " (+1)" else ""} · ${r.ride.priceText}" + (r.ride.driver?.let { " · $it" } ?: ""))
                         if (b != null && o != null && !o.active) Text("You would board in ${b.city}${b.street?.let { " ($it)" } ?: ""} at ${b.time ?: "?"}", style = MaterialTheme.typography.bodySmall)
                         if (r.note.isNotEmpty()) Text(r.note, style = MaterialTheme.typography.bodySmall)
+                        if (o != null && b != null && r.ride.price != null && (!o.active || o.city != b.city) && r.originLat != null)
+                            TextButton(onClick = { picking = r }) { Text("Find +10 / +20 € pickup towns") }
                     }
                 }
             }
